@@ -7,6 +7,20 @@
 #include <vector>
 #include "client_dll.hpp"
 #include "offsets.hpp"
+#include <iostream>
+#include <cmath>
+
+struct Vec3 {
+    float x, y, z;
+};
+
+// 计算 3D 距离
+float Get3DDistance(const Vec3& a, const Vec3& b) {
+    float dx = a.x - b.x;
+    float dy = a.y - b.y;
+    float dz = a.z - b.z;
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
 
 struct Config {
     int Delay = 5;
@@ -17,7 +31,7 @@ Config cfg;
 
 struct KeyItem { int vk; std::wstring name; };
 std::vector<KeyItem> keyItems = {
-    { VK_LBUTTON, L"Left Mouse button" }, { VK_RBUTTON, L"Right Mouse button" }, { VK_MBUTTON, L"Mid Mouse button" },
+    { VK_LBUTTON, L"Right Mouse button" }, { VK_RBUTTON, L"Left Mouse button" }, { VK_MBUTTON, L"Mid Mouse button" },
     { VK_XBUTTON1, L"Mouse side button1" }, { VK_XBUTTON2, L"Mouse side button2"},{ VK_LMENU, L"Left ALT" },{ VK_CONTROL, L"Left Ctrl" },
     { 'Q', L"Q" }, { 'E', L"E" }, { 'R', L"R" }, { 'T', L"T" },
     { 'F', L"F" }, { 'G', L"G" },
@@ -25,8 +39,16 @@ std::vector<KeyItem> keyItems = {
 };
 /*
 std::vector<KeyItem> keyItems = {
-    { VK_LBUTTON, L"報炎恣囚" }, { VK_RBUTTON, L"報炎嘔囚" }, { VK_MBUTTON, L"報炎嶄囚" },
-    { VK_XBUTTON1, L"報炎迦囚1" }, { VK_XBUTTON2, L"報炎迦囚2" },
+    { VK_LBUTTON, L"Right Mouse button" }, { VK_RBUTTON, L"Left Mouse button" }, { VK_MBUTTON, L"Mid Mouse button" },
+    { VK_XBUTTON1, L"Mouse side button1" }, { VK_XBUTTON2, L"Mouse side button2"},{ VK_LMENU, L"Left ALT" },{ VK_CONTROL, L"Left Ctrl" },
+    { 'Q', L"Q" }, { 'E', L"E" }, { 'R', L"R" }, { 'T', L"T" },
+    { 'F', L"F" }, { 'G', L"G" },
+    { 'Z', L"Z" }, { 'X', L"X" }, { 'C', L"C" }, { 'V', L"V" }, { 'B', L"B" }
+};
+* 
+std::vector<KeyItem> keyItems = {
+    { VK_LBUTTON, L"鼠标左键" }, { VK_RBUTTON, L"鼠标右键" }, { VK_MBUTTON, L"鼠标中键" },
+    { VK_XBUTTON1, L"鼠标侧键1" }, { VK_XBUTTON2, L"鼠标侧键2" },
     { 'Q', L"Q" }, { 'W', L"W" }, { 'E', L"E" }, { 'R', L"R" }, { 'T', L"T" },
     { 'A', L"A" }, { 'S', L"S" }, { 'D', L"D" }, { 'F', L"F" }, { 'G', L"G" },
     { 'Z', L"Z" }, { 'X', L"X" }, { 'C', L"C" }, { 'V', L"V" }, { 'B', L"B" }
@@ -41,6 +63,36 @@ static uintptr_t ReadMemory(HANDLE hProcess, uintptr_t address) {
     ReadProcessMemory(hProcess, reinterpret_cast<LPCVOID>(address), &buffer, sizeof(buffer), nullptr);
     return buffer;
 }
+
+int GetWeaponId(HANDLE hProc, uintptr_t PlayerPawn) {
+    if (!PlayerPawn) return 0;
+
+    // 读取 m_pClippingWeapon
+    uintptr_t clipping_weapon = 0;
+    ReadProcessMemory(hProc,
+        (LPCVOID)(PlayerPawn + cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_pClippingWeapon),
+        &clipping_weapon,
+        sizeof(clipping_weapon),
+        nullptr);
+
+    if (!clipping_weapon) return 1;
+
+    // 读取 weapon index
+    USHORT weaponindex = 0;
+    ReadProcessMemory(hProc,
+        (LPCVOID)(clipping_weapon
+            + cs2_dumper::schemas::client_dll::C_EconEntity::m_AttributeManager
+            + cs2_dumper::schemas::client_dll::C_AttributeContainer::m_Item
+            + cs2_dumper::schemas::client_dll::C_EconItemView::m_iItemDefinitionIndex),
+        &weaponindex,
+        sizeof(weaponindex),
+        nullptr);
+
+    if (!weaponindex) return 2;
+
+    return weaponindex;
+}
+
 
 static uintptr_t GetBaseEntityFromHandle(HANDLE hProcess, uint32_t uHandle, uintptr_t clientBase) {
     uintptr_t entListBase = ReadMemory(hProcess, clientBase + cs2_dumper::offsets::client_dll::dwEntityList);
@@ -128,7 +180,8 @@ bool CreateMainWindow(HINSTANCE hInstance, int nCmdShow) {
         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
         100, 10, 150, 200,
         hwndMain, nullptr, hInstance, nullptr);
-
+    //Continuous/Delay     Trigger key\nCS2TB BY Github/Akaline-tech
+    //开火持续时间/延迟射击 触发按键\n时间单位为毫秒
     HWND hStatic = CreateWindow(L"STATIC", L"Continuous/Delay     Trigger key\nCS2TB BY Github/Akaline-tech",
         WS_CHILD | WS_VISIBLE,
         10, 40, 250, 45,
@@ -170,44 +223,75 @@ void TriggerBotThread() {
         if (!localPawn) { std::this_thread::sleep_for(std::chrono::milliseconds(1)); continue; }
 
         int localHealth = 0;
-        ReadProcessMemory(hProc, (LPCVOID)(localPawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iHealth),&localHealth, sizeof(localHealth), nullptr);//localPawn->localHealth
+        ReadProcessMemory(hProc, (LPCVOID)(localPawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iHealth), &localHealth, sizeof(localHealth), nullptr);
         if (localHealth <= 0) { std::this_thread::sleep_for(std::chrono::milliseconds(1)); continue; }
 
         int localTeam = 0;
-        ReadProcessMemory(hProc, (LPCVOID)(localPawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iTeamNum),
-            &localTeam, sizeof(localTeam), nullptr);
+        ReadProcessMemory(hProc, (LPCVOID)(localPawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iTeamNum), &localTeam, sizeof(localTeam), nullptr);
 
         uint32_t cross = 0;
-        ReadProcessMemory(hProc, (LPCVOID)(localPawn + cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_iIDEntIndex),&cross, sizeof(cross), nullptr);//Aiming entity localPawn->m_iIDEntIndex
+        ReadProcessMemory(hProc, (LPCVOID)(localPawn + cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_iIDEntIndex), &cross, sizeof(cross), nullptr);
         if (cross == 0 || cross == 0xFFFFFFFF) { std::this_thread::sleep_for(std::chrono::milliseconds(1)); continue; }
 
         auto playerpawn = GetBaseEntityFromHandle(hProc, cross, clientBase);
         if (!playerpawn) continue;
 
         int playerteam = 0;
-        ReadProcessMemory(hProc, (LPCVOID)(playerpawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iTeamNum),&playerteam, sizeof(playerteam), nullptr);
+        ReadProcessMemory(hProc, (LPCVOID)(playerpawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iTeamNum), &playerteam, sizeof(playerteam), nullptr);
         if (playerteam == localTeam) continue;
 
         int playerHealth = 0;
         ReadProcessMemory(hProc, (LPCVOID)(playerpawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iHealth), &playerHealth, sizeof(playerHealth), nullptr);
         if (playerHealth == 0) continue;
 
+        Vec3 localPos, enemyPos;
+        ReadProcessMemory(hProc, (LPCVOID)(localPawn + cs2_dumper::schemas::client_dll::C_BasePlayerPawn::m_vOldOrigin), &localPos, sizeof(localPos), nullptr);
+        ReadProcessMemory(hProc, (LPCVOID)(playerpawn + cs2_dumper::schemas::client_dll::C_BasePlayerPawn::m_vOldOrigin), &enemyPos, sizeof(enemyPos), nullptr);
+
+        int weaponId = GetWeaponId(hProc, localPawn);
+
         if ((GetAsyncKeyState(cfg.aimKey) & 0x8000)) {
-            INPUT input = { 0 };
-            input.type = INPUT_MOUSE;
-            input.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+            if (weaponId != 59 && weaponId != 42 && weaponId != 507) {
+                INPUT input = { 0 };
+                input.type = INPUT_MOUSE;
+                input.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(cfg.Delay));
-            SendInput(1, &input, sizeof(INPUT));
+                std::this_thread::sleep_for(std::chrono::milliseconds(cfg.Delay));
+                SendInput(1, &input, sizeof(INPUT));
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(cfg.UpDelay));
-            input.mi.dwFlags = MOUSEEVENTF_LEFTUP;
-            SendInput(1, &input, sizeof(INPUT));
+                std::this_thread::sleep_for(std::chrono::milliseconds(cfg.UpDelay));
+                input.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+                SendInput(1, &input, sizeof(INPUT));
+            }
+            else if (Get3DDistance(localPos, enemyPos) < 85) {
+                Sleep(5);
+                INPUT input = { 0 };
+                input.type = INPUT_MOUSE;
+
+                if (playerHealth <= 65 && playerHealth >= 25 && Get3DDistance(localPos, enemyPos) <= 71) {
+                    // 右键攻击
+                    input.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
+                    SendInput(1, &input, sizeof(INPUT));
+                    Sleep(5);
+                    input.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
+                    SendInput(1, &input, sizeof(INPUT));
+                }
+                else {
+                    // 左键攻击
+                    input.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+                    SendInput(1, &input, sizeof(INPUT));
+                    Sleep(5);
+                    input.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+                    SendInput(1, &input, sizeof(INPUT));
+                }
+            }
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));//cpusleep
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1)); // CPU 减负
     }
     CloseHandle(hProc);
 }
+
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     if (!CreateMainWindow(hInstance, nCmdShow)) return 1;
