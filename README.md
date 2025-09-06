@@ -1,6 +1,7 @@
 # CS2 External TriggerBot
 
-![Demo](https://raw.githubusercontent.com/yourname/cs2-external-cheat/main/images/example.png)
+![Demo](example.png)
+
 
 
 ## 🔄 How To UpData offsets
