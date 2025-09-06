@@ -8,7 +8,6 @@
 #include "client_dll.hpp"
 #include "offsets.hpp"
 
-// ===================== 配置 =====================
 struct Config {
     int Delay = 5;
     int UpDelay = 50;       // ms
@@ -16,10 +15,9 @@ struct Config {
 };
 Config cfg;
 
-// ===================== 键位列表（使用宽字符串） =====================
 struct KeyItem { int vk; std::wstring name; };
 std::vector<KeyItem> keyItems = {
-    { VK_LBUTTON, L"Right Mouse button" }, { VK_RBUTTON, L"Left Mouse button" }, { VK_MBUTTON, L"Mid Mouse button" },
+    { VK_LBUTTON, L"Left Mouse button" }, { VK_RBUTTON, L"Right Mouse button" }, { VK_MBUTTON, L"Mid Mouse button" },
     { VK_XBUTTON1, L"Mouse side button1" }, { VK_XBUTTON2, L"Mouse side button2"},{ VK_LMENU, L"Left ALT" },{ VK_CONTROL, L"Left Ctrl" },
     { 'Q', L"Q" }, { 'E', L"E" }, { 'R', L"R" }, { 'T', L"T" },
     { 'F', L"F" }, { 'G', L"G" },
@@ -27,8 +25,8 @@ std::vector<KeyItem> keyItems = {
 };
 /*
 std::vector<KeyItem> keyItems = {
-    { VK_LBUTTON, L"鼠标左键" }, { VK_RBUTTON, L"鼠标右键" }, { VK_MBUTTON, L"鼠标中键" },
-    { VK_XBUTTON1, L"鼠标侧键1" }, { VK_XBUTTON2, L"鼠标侧键2" },
+    { VK_LBUTTON, L"鍫辩値鎭ｅ洑" }, { VK_RBUTTON, L"鍫辩値鍢斿洑" }, { VK_MBUTTON, L"鍫辩値宥勫洑" },
+    { VK_XBUTTON1, L"鍫辩値杩﹀洑1" }, { VK_XBUTTON2, L"鍫辩値杩﹀洑2" },
     { 'Q', L"Q" }, { 'W', L"W" }, { 'E', L"E" }, { 'R', L"R" }, { 'T', L"T" },
     { 'A', L"A" }, { 'S', L"S" }, { 'D', L"D" }, { 'F', L"F" }, { 'G', L"G" },
     { 'Z', L"Z" }, { 'X', L"X" }, { 'C', L"C" }, { 'V', L"V" }, { 'B', L"B" }
